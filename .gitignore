@@ -1,0 +1,27 @@
+# Build artifacts
+dist/
+build/
+*.zip
+*.crx
+*.pem
+
+# Python (icon generator)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# Chrome / extension dev
+key.pem
+
+# Claude Code local project state
+.claude/

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Clear History &amp; Close</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="hdr">
+    <img src="icons/icon48.png" alt="" class="logo" />
+    <div>
+      <h1>Clear History</h1>
+      <p class="subtitle">Keeps passwords &amp; saved forms</p>
+    </div>
+  </header>
+
+  <main>
+    <button id="clearAndClose" class="primary" type="button">
+      <span class="icon">&#x2715;</span>
+      <span class="label">Clear &amp; Close</span>
+    </button>
+
+    <button id="autoMode" class="secondary" type="button" aria-live="polite">
+      <span class="dot" id="modeDot"></span>
+      <span class="label" id="modeLabel">Auto-Clear: Off</span>
+    </button>
+
+    <p id="status" class="status" role="status"></p>
+
+    <details class="what">
+      <summary>What gets cleared?</summary>
+      <ul>
+        <li>Browsing &amp; download history</li>
+        <li>Cookies &amp; other site data</li>
+        <li>Cached images &amp; files</li>
+        <li>IndexedDB, local &amp; session storage</li>
+        <li>Service workers, file systems, WebSQL</li>
+      </ul>
+      <p class="kept">Kept: <strong>passwords</strong> and <strong>saved form data</strong>.</p>
+    </details>
+  </main>
+
+  <footer>
+    <span class="ver">v1.0.0</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
