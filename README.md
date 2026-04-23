@@ -1,5 +1,14 @@
 # Clear History &amp; Close
 
+![status: alpha](https://img.shields.io/badge/status-alpha-orange)
+![version](https://img.shields.io/badge/version-0.1.0-blue)
+![manifest](https://img.shields.io/badge/manifest-v3-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
+
+> &#x26A0;&#xFE0F; **Alpha — cake is not cooked yet.**
+> This extension has **not** been published to the Chrome Web Store.
+> APIs and UI may change. File bugs and feedback under [Issues](https://github.com/doxender/ChromeDeleteHistoryPlugin/issues).
+
 A minimal Chrome extension (Manifest V3) that wipes your browsing history, cache,
 cookies, downloads, and local site data in one click — then closes Chrome.
 Saved passwords and form-autofill data are **kept**.
@@ -65,6 +74,24 @@ No host permissions. No network access. Nothing is uploaded anywhere.
 python -m pip install Pillow
 python tools/generate_icons.py
 ```
+
+## Roadmap
+
+Pre-1.0 (things to finish before Chrome Web Store submission):
+
+- [ ] Dogfood auto-clear on close &amp; idle across multi-window sessions
+- [ ] Options page for configurable idle timeout (currently hardcoded at 5 min)
+- [ ] Optional whitelist — domains whose cookies survive a clear
+- [ ] Keyboard shortcut (e.g. Ctrl+Shift+Del-and-close)
+- [ ] Localization (English only for now)
+- [ ] Store listing: screenshots, promo tile, privacy-policy hosting
+- [ ] First-install onboarding tab explaining what the toggle does
+
+## Contributing
+
+Happy to take PRs or issues. This is alpha — small, targeted patches are the
+easiest to land. For bigger changes, open an issue first so we can sync on
+scope.
 
 ## License
 

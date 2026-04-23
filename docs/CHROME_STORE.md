@@ -17,7 +17,7 @@ From the project root:
 
 ```bash
 # PowerShell
-Compress-Archive -Path manifest.json,background.js,popup.html,popup.css,popup.js,icons -DestinationPath dist\clear-history-and-close-v1.0.0.zip -Force
+Compress-Archive -Path manifest.json,background.js,popup.html,popup.css,popup.js,icons -DestinationPath dist\clear-history-and-close-v0.1.0.zip -Force
 ```
 
 Don't include: `tools/`, `docs/`, `.git/`, `README.md`, `PRIVACY.md`, `LICENSE`.
@@ -52,4 +52,4 @@ Only files the extension actually loads.
 ## After publish
 
 - Add the store URL to README badges.
-- Tag the release: `git tag v1.0.0 &amp;&amp; git push origin v1.0.0`.
+- Tag the release: `git tag v0.1.0 &amp;&amp; git push origin v0.1.0`.
