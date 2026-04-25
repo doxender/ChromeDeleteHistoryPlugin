@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Clear History & Close",
   "short_name": "ClearHistory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One-click: wipe all browsing history, cache, cookies & downloads (keeps passwords & saved forms) and close Chrome. Optional auto-clear on close or idle.",
   "author": "Dan Oxender",
   "minimum_chrome_version": "110",
