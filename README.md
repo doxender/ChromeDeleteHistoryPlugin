@@ -1,13 +1,14 @@
 # Clear History &amp; Close
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.1.1-blue)
 ![manifest](https://img.shields.io/badge/manifest-v3-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 > &#x26A0;&#xFE0F; **Alpha — cake is not cooked yet.**
 > This extension has **not** been published to the Chrome Web Store.
 > APIs and UI may change. File bugs and feedback under [Issues](https://github.com/doxender/ChromeDeleteHistoryPlugin/issues).
+> Release history in [CHANGELOG.md](CHANGELOG.md).
 
 A minimal Chrome extension (Manifest V3) that wipes your browsing history, cache,
 cookies, downloads, and local site data in one click — then closes Chrome.
@@ -16,8 +17,13 @@ Saved passwords and form-autofill data are **kept**.
 ## Features
 
 - **One-click Clear &amp; Close** — wipes everything (except passwords &amp; form data) and exits Chrome.
-- **Auto-Clear on Close** — clears when the last Chrome window is closed (with a
-  next-startup fallback in case the service worker is torn down first).
+- **Auto-Clear on Close** — clears when the **last** Chrome window is closed.
+  Single tabs and non-final windows do not trigger a clear; only the final
+  window-removal does. The handler is debounced and idempotent so the Windows
+  taskbar "Close all windows" action and Alt-F4 on the last window both fire
+  reliably without race conditions. A `pendingClearOnClose` flag in
+  `chrome.storage.local` arms a next-startup fallback in case the service
+  worker is torn down before `chrome.browsingData.remove()` resolves.
 - **Auto-Clear When Idle** — clears after 5 minutes of inactivity using the
   `chrome.idle` API.
 - **Permissions requested at install time** so everything works immediately.
