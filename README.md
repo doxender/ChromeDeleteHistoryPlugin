@@ -1,7 +1,7 @@
 # Clear History &amp; Close
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
-![version](https://img.shields.io/badge/version-0.1.1-blue)
+![version](https://img.shields.io/badge/version-0.1.2-blue)
 ![manifest](https://img.shields.io/badge/manifest-v3-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -19,11 +19,12 @@ Saved passwords and form-autofill data are **kept**.
 - **One-click Clear &amp; Close** — wipes everything (except passwords &amp; form data) and exits Chrome.
 - **Auto-Clear on Close** — clears when the **last** Chrome window is closed.
   Single tabs and non-final windows do not trigger a clear; only the final
-  window-removal does. The handler is debounced and idempotent so the Windows
-  taskbar "Close all windows" action and Alt-F4 on the last window both fire
-  reliably without race conditions. A `pendingClearOnClose` flag in
-  `chrome.storage.local` arms a next-startup fallback in case the service
-  worker is torn down before `chrome.browsingData.remove()` resolves.
+  window-removal does. Because Manifest V3 service workers can't reliably
+  finish large I/O during Chrome shutdown, the actual clear runs on the
+  *next Chrome startup* — guaranteed atomic, no partial-clear bug. (A
+  best-effort attempt also fires at close-time; if it completes, fine, but
+  the design doesn't depend on it.) Net behavior: data is always gone, just
+  possibly at next launch instead of at close.
 - **Auto-Clear When Idle** — clears after 5 minutes of inactivity using the
   `chrome.idle` API.
 - **Permissions requested at install time** so everything works immediately.
