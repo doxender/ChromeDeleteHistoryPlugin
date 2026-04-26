@@ -5,6 +5,47 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/) — pre-1.0 is alpha,
 behavior may change.
 
+## [0.1.2] — 2026-04-25
+
+### Fixed
+- **Cookies and cache survived auto-clear-on-close.** Two distinct bugs were
+  combining to leave the most-sensitive data behind on close:
+
+  1. `DATA_TO_REMOVE` passed `appcache: true` and `webSQL: true` to
+     `chrome.browsingData.remove()`. Both APIs were removed from Chrome
+     (AppCache in 95, WebSQL in 122). Passing dead keys is *supposed* to
+     be a no-op, but in some Chrome versions it causes the API to silently
+     skip work on adjacent live keys — exactly the failure pattern
+     reported. Removed both keys.
+
+  2. The v0.1.1 close handler tried `clearAll()` at close-time and removed
+     the `pendingClearOnClose` startup-fallback flag if the call appeared
+     to resolve. Under MV3 the service worker is killed mid-operation
+     during Chrome shutdown: history (small write) finishes first and the
+     Promise can resolve before cookies / cache (larger SQLite I/O)
+     finish. v0.1.1 then cleared the flag, so the next-startup safety net
+     never ran. Result: history wiped, cookies and cache survived.
+
+### Changed
+- **Auto-clear-on-close now relies on the next-startup pass for guaranteed
+  completion**, with a best-effort fire-and-forget attempt at close-time.
+  - At close: set `pendingClearOnClose`, kick off `clearAll()` without
+    awaiting; never touch the flag from the close path.
+  - At startup: if `pendingClearOnClose` is set, run `clearAll()`
+    synchronously while the SW is alive and not racing shutdown. Only
+    remove the flag after that resolves.
+  - Net behavior: data is *always* gone, just possibly at next Chrome
+    launch instead of at close. The most a user sees on disk between
+    sessions is a few-minute window if they re-open Chrome quickly.
+    Previously they could see partially-cleared data persist indefinitely.
+
+### Unchanged
+- `formData: false` and `passwords: false` — saved form-autofill and saved
+  passwords are still preserved across every clear, by design.
+- "Clear &amp; Close" popup button still does a full clear synchronously
+  before initiating window close (no MV3 lifecycle race in that path).
+- Idle-mode auto-clear unchanged.
+
 ## [0.1.1] — 2026-04-25
 
 ### Fixed

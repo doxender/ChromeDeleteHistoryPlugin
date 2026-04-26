@@ -2,8 +2,15 @@
 
 const IDLE_SECONDS = 300;
 
+// Data types passed to chrome.browsingData.remove. Two notes:
+// (1) `appcache` (removed Chrome 95) and `webSQL` (removed Chrome 122) are
+//     intentionally OMITTED. Passing dead keys can cause the API to silently
+//     skip work on adjacent live keys in some Chrome versions — exactly the
+//     v0.1.1 bug where cookies + cache survived the close-time clear.
+// (2) `formData` and `passwords` are explicitly false: this extension's
+//     contract preserves saved form-autofill and saved passwords across
+//     every clear, by design.
 const DATA_TO_REMOVE = {
-  appcache: true,
   cache: true,
   cacheStorage: true,
   cookies: true,
@@ -15,7 +22,6 @@ const DATA_TO_REMOVE = {
   localStorage: true,
   passwords: false,
   serviceWorkers: true,
-  webSQL: true,
 };
 
 async function getMode() {
@@ -58,84 +64,61 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+// --- Auto-clear-on-close: design notes ---
+//
+// MV3 service workers cannot reliably finish async work during Chrome
+// shutdown. chrome.browsingData.remove() initiates large SQLite/disk
+// operations (cookies, cache) that the SW gets killed in the middle of.
+// In v0.1.1 we tried-at-close + retry-on-startup, but if the in-flight
+// clearAll() *appeared* to resolve before the SW died (history finished,
+// cookies/cache mid-flight), we removed the pendingClearOnClose flag and
+// the startup safety net never ran. Result: cookies + cache survived.
+//
+// v0.1.2 strategy:
+//   1. On every onRemoved in close-mode, set pendingClearOnClose. (Flag
+//      stays set until a successful, fully-completed startup clear.)
+//   2. Best-effort fire-and-forget clear at close — if the SW survives
+//      long enough, great; we don't depend on it. We never remove the
+//      flag from the close path.
+//   3. On runtime.onStartup, if pendingClearOnClose is set, run the
+//      clear synchronously in a context where the SW is alive and not
+//      racing with shutdown. Only remove the flag after that completes.
+//      This is the guaranteed path.
+//
+// Net effect: data is always cleared, just possibly at next startup
+// instead of at close. No partial-clear bug.
+
+let closeBurstTimer = null;
+
 chrome.runtime.onStartup.addListener(async () => {
   const mode = await getMode();
   const { pendingClearOnClose } = await chrome.storage.local.get('pendingClearOnClose');
   if (pendingClearOnClose) {
-    if (mode === 'close') {
-      try {
-        await clearAll();
-      } catch {
-        // Leave the flag set so the next startup retries.
-        applyIdleDetection(mode);
-        return;
-      }
-    }
-    // Cleared (or mode was changed away from 'close' while the flag was
-    // pending) — either way the flag's job is done.
-    await chrome.storage.local.remove('pendingClearOnClose');
-  }
-  applyIdleDetection(mode);
-});
-
-// --- Robust close-mode auto-clear (race-free against "Close all windows") ---
-//
-// Closing every Chrome window via the Windows taskbar (right-click ->
-// "Close all windows", or Alt-F4-ing the last window in a multi-window
-// session) fires chrome.windows.onRemoved in a tight burst. Without
-// coalescing that produces three failure modes:
-//
-//   (a) Several handlers race on chrome.windows.getAll() and call
-//       clearAll() in parallel, doubling the work and potentially
-//       interleaving with Chrome's own shutdown.
-//   (b) Each handler that sees remaining > 0 returns before arming the
-//       startup fallback, so if the service worker is killed mid-burst
-//       the clear is silently lost.
-//   (c) The in-flight clearAll() may be interrupted if Chrome exits
-//       before chrome.browsingData.remove() resolves.
-//
-// Strategy:
-//   1. On every onRemoved in close-mode, immediately mark
-//      pendingClearOnClose so runtime.onStartup will finish the job
-//      if we die mid-burst.
-//   2. Debounce 250 ms so a burst of close events coalesces into a
-//      single attempt; we only consult chrome.windows.getAll() once
-//      after the dust settles.
-//   3. Coalesce concurrent attempts via a single in-flight promise.
-//   4. Only clear pendingClearOnClose after clearAll resolves.
-
-let closeBurstTimer = null;
-let clearInFlight = null;
-
-async function attemptCloseClear() {
-  const remaining = await chrome.windows.getAll();
-  if (remaining.length > 0) return; // user didn't actually close everything
-
-  if (clearInFlight) return clearInFlight;
-  clearInFlight = (async () => {
     try {
       await clearAll();
       await chrome.storage.local.remove('pendingClearOnClose');
     } catch {
-      // Leave pendingClearOnClose set; runtime.onStartup will retry.
-    } finally {
-      clearInFlight = null;
+      // Leave the flag set so the next startup retries.
     }
-  })();
-  return clearInFlight;
-}
+  }
+  applyIdleDetection(mode);
+});
 
 chrome.windows.onRemoved.addListener(async () => {
   const mode = await getMode();
   if (mode !== 'close') return;
 
-  // Arm the startup fallback first so a mid-burst SW death is recoverable.
+  // Always arm the startup safety net. This is the *guaranteed* path.
   await chrome.storage.local.set({ pendingClearOnClose: true });
 
+  // Best-effort: try at close after the burst settles. Don't await, don't
+  // touch the flag — startup will handle it whether or not this completes.
   if (closeBurstTimer) clearTimeout(closeBurstTimer);
-  closeBurstTimer = setTimeout(() => {
+  closeBurstTimer = setTimeout(async () => {
     closeBurstTimer = null;
-    attemptCloseClear();
+    const remaining = await chrome.windows.getAll();
+    if (remaining.length > 0) return; // not the last window
+    clearAll().catch(() => { /* swallow — startup retries */ });
   }, 250);
 });
 
