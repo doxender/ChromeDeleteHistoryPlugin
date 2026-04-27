@@ -31,17 +31,19 @@
       <summary>What gets cleared?</summary>
       <ul>
         <li>Browsing &amp; download history</li>
-        <li>Cookies &amp; other site data</li>
+        <li>Cookies &amp; other site data (incl. hosted apps)</li>
         <li>Cached images &amp; files</li>
         <li>IndexedDB, local &amp; session storage</li>
-        <li>Service workers, file systems, WebSQL</li>
+        <li>Service workers &amp; file systems</li>
+        <li>Site settings (notification, location, camera grants)</li>
       </ul>
       <p class="kept">Kept: <strong>passwords</strong> and <strong>saved form data</strong>.</p>
     </details>
   </main>
 
   <footer>
-    <span class="ver">v0.1.2 &middot; alpha</span>
+    <span class="ver">v0.1.4 &middot; alpha</span>
+    <span class="lastclear" id="lastClear">&nbsp;</span>
   </footer>
 
   <script src="popup.js"></script>

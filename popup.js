@@ -59,8 +59,31 @@ async function cycleMode() {
   );
 }
 
+function formatRelative(ms) {
+  if (ms < 0 || !Number.isFinite(ms)) return 'never';
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
+}
+
+async function paintLastClear() {
+  const { lastClearedAt } = await chrome.storage.local.get('lastClearedAt');
+  const el = $('lastClear');
+  if (!lastClearedAt) {
+    el.textContent = 'never cleared';
+    return;
+  }
+  el.textContent = `cleared ${formatRelative(Date.now() - lastClearedAt)}`;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   paintMode(await getMode());
+  await paintLastClear();
   $('clearAndClose').addEventListener('click', clearAndClose);
   $('autoMode').addEventListener('click', cycleMode);
 });

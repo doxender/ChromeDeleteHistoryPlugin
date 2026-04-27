@@ -17,7 +17,7 @@ From the project root:
 
 ```bash
 # PowerShell
-Compress-Archive -Path manifest.json,background.js,popup.html,popup.css,popup.js,icons -DestinationPath dist\clear-history-and-close-v0.1.0.zip -Force
+Compress-Archive -Path manifest.json,background.js,popup.html,popup.css,popup.js,icons -DestinationPath dist\clear-history-and-close-v0.1.3.zip -Force
 ```
 
 Don't include: `tools/`, `docs/`, `.git/`, `README.md`, `PRIVACY.md`, `LICENSE`.
@@ -30,7 +30,7 @@ Only files the extension actually loads.
 3. **New item** -> upload the zip from `dist/`.
 4. Fill in store listing:
    - **Name:** Clear History &amp; Close
-   - **Summary (132 chars max):** "One-click wipe of history, cache, cookies &amp; downloads — keeps passwords &amp; saved forms. Auto-clear on close or idle."
+   - **Summary (132 chars max):** "One-click wipe of history, cookies, cache, downloads, hosted-app data &amp; site settings. Keeps passwords &amp; saved forms."
    - **Category:** Productivity (secondary: Privacy &amp; Security)
    - **Language:** English
    - **Screenshots (1280x800 or 640x400):** popup open, popup with auto-mode toggle lit, the "what gets cleared" panel expanded.
@@ -40,6 +40,7 @@ Only files the extension actually loads.
    - Single purpose: "Delete browsing data and close Chrome."
    - Justify each permission. The answers match [PRIVACY.md](../PRIVACY.md):
      - `browsingData` — core functionality, delete user-selected data types.
+     - `contentSettings` — reset per-site permission grants ("Site Settings") on each clear.
      - `storage` — persist the user's auto-clear preference.
      - `idle` — trigger auto-clear after inactivity.
      - `alarms` — clear the one-time "NEW" badge after install.
@@ -52,4 +53,4 @@ Only files the extension actually loads.
 ## After publish
 
 - Add the store URL to README badges.
-- Tag the release: `git tag v0.1.0 &amp;&amp; git push origin v0.1.0`.
+- Tag the release: `git tag v0.1.3 &amp;&amp; git push origin v0.1.3`.

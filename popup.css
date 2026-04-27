@@ -159,6 +159,17 @@ button:disabled { opacity: 0.6; cursor: default; transform: none; }
 }
 
 footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lastclear {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+footer {
   padding: 0 16px 10px;
   text-align: right;
   color: var(--muted);
