@@ -5,6 +5,36 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/) — pre-1.0 is alpha,
 behavior may change.
 
+## [0.1.3] — 2026-04-25
+
+### Fixed
+- **Cookies and cached files of hosted apps survived every clear.** Chrome's
+  `browsingData.remove()` defaults to `originTypes: { unprotectedWeb: true }`,
+  which excludes any website the user has installed as a hosted app from
+  `chrome://apps` (Gmail-as-app, Workspace apps, etc.). Their cookies and
+  storage were treated as "protected" and never touched. Now passes
+  `originTypes: { unprotectedWeb: true, protectedWeb: true }` so hosted-app
+  data goes too. The extension's own storage (`originTypes.extension`)
+  remains off so the user's auto-clear preference survives.
+
+### Added
+- **Site Settings reset on every clear.** The "Site Settings" bucket in
+  Chrome's Clear-Browsing-Data dialog (per-site notification grants,
+  location grants, camera/microphone permissions, popup exceptions,
+  automatic-downloads exceptions, and so on) lives in `chrome.contentSettings`,
+  not `chrome.browsingData`. Every clear (manual button, auto-on-close,
+  auto-on-idle) now also calls `chrome.contentSettings.<type>.clear({scope:
+  'regular'})` for every supported content-setting type. Types unavailable
+  in the user's Chrome build are skipped silently.
+- **`contentSettings` permission** added to `manifest.json`. Required for
+  the Site Settings reset above. Justification mirrored in `PRIVACY.md`
+  and `docs/CHROME_STORE.md`.
+
+### Note for users
+- After upgrading to 0.1.3 you'll need to **reload the extension** at
+  `chrome://extensions` so Chrome picks up the new permission. The popup
+  footer should read `v0.1.3 · alpha` once it's running.
+
 ## [0.1.2] — 2026-04-25
 
 ### Fixed

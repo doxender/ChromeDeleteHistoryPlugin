@@ -29,8 +29,66 @@ async function getMode() {
   return autoMode;
 }
 
+// chrome.contentSettings types this extension resets on clear. These are
+// the user's per-site exceptions (notification permissions, location
+// grants, popup exceptions, etc.) — Chrome's UI groups them under the
+// "Site Settings" bucket in the Clear-Browsing-Data dialog. Each type
+// supported by chrome.contentSettings is enumerated here; entries that
+// aren't supported in the current Chrome version are skipped silently.
+const CONTENT_SETTINGS_TYPES = [
+  'cookies',
+  'images',
+  'javascript',
+  'location',
+  'plugins',
+  'popups',
+  'notifications',
+  'fullscreen',
+  'mouselock',
+  'microphone',
+  'camera',
+  'unsandboxedPlugins',
+  'automaticDownloads',
+];
+
+async function clearContentSettings() {
+  if (!chrome.contentSettings) return;
+  await Promise.all(
+    CONTENT_SETTINGS_TYPES.map(async (type) => {
+      const api = chrome.contentSettings[type];
+      if (!api?.clear) return;
+      try {
+        await api.clear({ scope: 'regular' });
+      } catch {
+        // Type unavailable in this Chrome build, or already empty.
+      }
+    })
+  );
+}
+
 async function clearAll() {
-  await chrome.browsingData.remove({ since: 0 }, DATA_TO_REMOVE);
+  // originTypes:
+  //   unprotectedWeb (default true) — regular websites
+  //   protectedWeb               — websites installed as hosted apps. Without
+  //                                this, a user with Gmail/Workspace installed
+  //                                from chrome://apps keeps their cookies and
+  //                                localStorage across clears (the "Hosted app
+  //                                data" bucket in Chrome's UI).
+  //   extension                  — this extension's own data; off so the user
+  //                                doesn't lose their auto-mode preference.
+  await chrome.browsingData.remove(
+    {
+      since: 0,
+      originTypes: { unprotectedWeb: true, protectedWeb: true },
+    },
+    DATA_TO_REMOVE
+  );
+
+  // chrome.browsingData.remove() doesn't touch site-settings rules
+  // (notification grants, location exceptions, etc.) — those live under
+  // chrome.contentSettings and have to be reset separately.
+  await clearContentSettings();
+
   await chrome.storage.local.set({ lastClearedAt: Date.now() });
 }
 

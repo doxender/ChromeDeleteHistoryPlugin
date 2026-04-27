@@ -1,7 +1,7 @@
 # Clear History &amp; Close
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
-![version](https://img.shields.io/badge/version-0.1.2-blue)
+![version](https://img.shields.io/badge/version-0.1.3-blue)
 ![manifest](https://img.shields.io/badge/manifest-v3-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -11,8 +11,8 @@
 > Release history in [CHANGELOG.md](CHANGELOG.md).
 
 A minimal Chrome extension (Manifest V3) that wipes your browsing history, cache,
-cookies, downloads, and local site data in one click — then closes Chrome.
-Saved passwords and form-autofill data are **kept**.
+cookies, downloads, hosted-app data, site settings, and local site data in one
+click — then closes Chrome. Saved passwords and form-autofill data are **kept**.
 
 ## Features
 
@@ -36,10 +36,12 @@ Saved passwords and form-autofill data are **kept**.
 | Browsing history | &#x2714; |
 | Download history | &#x2714; |
 | Cookies &amp; other site data | &#x2714; |
+| **Hosted app data** (cookies / storage of apps installed from `chrome://apps`) | &#x2714; |
 | Cached images &amp; files | &#x2714; |
 | IndexedDB &amp; Cache Storage | &#x2714; |
 | Local &amp; session storage | &#x2714; |
-| Service workers, WebSQL, FileSystem | &#x2714; |
+| Service workers &amp; FileSystem | &#x2714; |
+| **Site Settings** (notification, location, camera, popup, etc. exceptions) | &#x2714; |
 | **Saved passwords** | &#x2716; kept |
 | **Autofill / form data** | &#x2716; kept |
 
@@ -56,7 +58,7 @@ Coming soon. See [`docs/CHROME_STORE.md`](docs/CHROME_STORE.md) for the publish 
 
 ## How it works
 
-- `manifest.json` — MV3 manifest, declares `browsingData`, `storage`, `idle`, `alarms`.
+- `manifest.json` — MV3 manifest, declares `browsingData`, `contentSettings`, `storage`, `idle`, `alarms`.
 - `popup.html` / `popup.css` / `popup.js` — the popup UI (Clear &amp; Close button and auto-mode toggle).
 - `background.js` — service worker: listens for window-close and idle events,
   handles messages from the popup, persists settings via `chrome.storage.sync`.
@@ -67,7 +69,8 @@ Coming soon. See [`docs/CHROME_STORE.md`](docs/CHROME_STORE.md) for the publish 
 
 | Permission | Why |
 |---|---|
-| `browsingData` | Actually deleting the data. |
+| `browsingData` | Deleting cookies, cache, history, downloads, site storage. |
+| `contentSettings` | Resetting per-site permission grants (notifications, location, camera) and other site-settings exceptions — Chrome's "Site Settings" bucket. |
 | `storage` | Remembering your auto-clear mode across sessions. |
 | `idle` | Detecting when Chrome has been inactive for 5 minutes. |
 | `alarms` | One-time "welcome" badge cleanup after install. |

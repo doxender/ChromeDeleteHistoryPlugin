@@ -1,6 +1,6 @@
 # Privacy Policy — Clear History &amp; Close
 
-**Effective date:** 2026-04-23
+**Effective date:** 2026-04-25
 
 ## Summary
 
@@ -9,16 +9,22 @@ processing happens locally in your browser.
 
 ## What the extension accesses
 
-- **Browsing data** (history, cache, cookies, downloads, site storage) — only
-  in order to delete it at your request via the Chrome `browsingData` API. No
-  data is read or inspected; it is erased directly.
+- **Browsing data** (history, cache, cookies, downloads, site storage,
+  hosted-app data) — only in order to delete it at your request via the
+  Chrome `browsingData` API. No data is read or inspected; it is erased
+  directly.
+- **Site settings** (per-site permission grants for notifications,
+  location, camera, microphone, popups, etc.) — only in order to reset
+  them on a clear, via the `chrome.contentSettings` API. The extension
+  doesn't read which sites have which permissions; it just resets them
+  to defaults when you clear.
 - **Extension settings** — your chosen auto-clear mode is saved via
-  `chrome.storage.sync` so it persists across Chrome restarts and (if you are
-  signed into Chrome) syncs between your own devices. The only value stored is
-  the string `"off"`, `"close"`, or `"inactive"`.
-- **Idle state** — when you enable "Auto-Clear When Idle", the extension uses
-  `chrome.idle` to notice when Chrome has been inactive for 5 minutes so it can
-  trigger the clear action. Idle state is not recorded anywhere.
+  `chrome.storage.sync` so it persists across Chrome restarts and (if you
+  are signed into Chrome) syncs between your own devices. The only value
+  stored is the string `"off"`, `"close"`, or `"inactive"`.
+- **Idle state** — when you enable "Auto-Clear When Idle", the extension
+  uses `chrome.idle` to notice when Chrome has been inactive for 5 minutes
+  so it can trigger the clear action. Idle state is not recorded anywhere.
 
 ## What the extension does *not* do
 
@@ -33,6 +39,7 @@ processing happens locally in your browser.
 | Permission | Purpose |
 |---|---|
 | `browsingData` | Delete browsing data at your request. |
+| `contentSettings` | Reset per-site permission grants (notifications, location, camera, etc.) — what Chrome's UI calls "Site Settings". |
 | `storage` | Remember your auto-clear setting. |
 | `idle` | Detect inactivity (only when "Auto-Clear When Idle" is on). |
 | `alarms` | Clear the one-time welcome badge after install. |
