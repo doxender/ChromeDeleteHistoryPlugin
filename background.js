@@ -1,15 +1,14 @@
 'use strict';
 
 const IDLE_SECONDS = 300;
+const LOG = (...args) => console.log('[ClearHistory]', ...args);
 
-// Data types passed to chrome.browsingData.remove. Two notes:
+// Data types passed to chrome.browsingData.remove. Notes:
 // (1) `appcache` (removed Chrome 95) and `webSQL` (removed Chrome 122) are
-//     intentionally OMITTED. Passing dead keys can cause the API to silently
-//     skip work on adjacent live keys in some Chrome versions — exactly the
-//     v0.1.1 bug where cookies + cache survived the close-time clear.
+//     intentionally OMITTED — passing dead keys can cause some Chrome builds
+//     to silently skip work on adjacent live keys.
 // (2) `formData` and `passwords` are explicitly false: this extension's
-//     contract preserves saved form-autofill and saved passwords across
-//     every clear, by design.
+//     contract preserves saved form-autofill and saved passwords.
 const DATA_TO_REMOVE = {
   cache: true,
   cacheStorage: true,
@@ -24,17 +23,9 @@ const DATA_TO_REMOVE = {
   serviceWorkers: true,
 };
 
-async function getMode() {
-  const { autoMode = 'off' } = await chrome.storage.sync.get('autoMode');
-  return autoMode;
-}
-
-// chrome.contentSettings types this extension resets on clear. These are
-// the user's per-site exceptions (notification permissions, location
-// grants, popup exceptions, etc.) — Chrome's UI groups them under the
-// "Site Settings" bucket in the Clear-Browsing-Data dialog. Each type
-// supported by chrome.contentSettings is enumerated here; entries that
-// aren't supported in the current Chrome version are skipped silently.
+// chrome.contentSettings types this extension resets on clear. Each entry
+// supported by the current Chrome build will be cleared; unsupported ones
+// are skipped silently. Maps to Chrome's "Site Settings" UI bucket.
 const CONTENT_SETTINGS_TYPES = [
   'cookies',
   'images',
@@ -51,49 +42,115 @@ const CONTENT_SETTINGS_TYPES = [
   'automaticDownloads',
 ];
 
+async function getMode() {
+  const { autoMode = 'off' } = await chrome.storage.sync.get('autoMode');
+  return autoMode;
+}
+
 async function clearContentSettings() {
-  if (!chrome.contentSettings) return;
-  await Promise.all(
+  if (!chrome.contentSettings) {
+    LOG('clearContentSettings: chrome.contentSettings unavailable, skipping');
+    return;
+  }
+  const results = await Promise.all(
     CONTENT_SETTINGS_TYPES.map(async (type) => {
       const api = chrome.contentSettings[type];
-      if (!api?.clear) return;
+      if (!api?.clear) return { type, ok: false, reason: 'unsupported' };
       try {
         await api.clear({ scope: 'regular' });
-      } catch {
-        // Type unavailable in this Chrome build, or already empty.
+        return { type, ok: true };
+      } catch (e) {
+        return { type, ok: false, reason: String(e?.message || e) };
       }
     })
   );
+  const cleared = results.filter((r) => r.ok).map((r) => r.type);
+  const skipped = results.filter((r) => !r.ok);
+  LOG('clearContentSettings: cleared', cleared.length, 'of', CONTENT_SETTINGS_TYPES.length, '— types:', cleared);
+  if (skipped.length) LOG('clearContentSettings: skipped', skipped);
+}
+
+// Belt-and-suspenders cookie nuker: enumerate every cookie known to Chrome
+// and remove it individually. chrome.cookies API uses a different code path
+// than chrome.browsingData.remove, so if the bulk remove silently fails for
+// cookies (which is what we're chasing in v0.1.4), this catches the leftovers.
+async function nukeAllCookiesIndividually() {
+  if (!chrome.cookies) {
+    LOG('nukeAllCookiesIndividually: chrome.cookies unavailable, skipping');
+    return { attempted: 0, removed: 0 };
+  }
+  const cookies = await chrome.cookies.getAll({});
+  LOG('nukeAllCookiesIndividually: found', cookies.length, 'cookies before remove');
+  let removed = 0;
+  await Promise.all(
+    cookies.map(async (c) => {
+      // Reconstruct the URL the cookie applies to. domain may have a leading
+      // dot for cross-subdomain cookies; strip it. path is required.
+      const protocol = c.secure ? 'https' : 'http';
+      const host = c.domain.startsWith('.') ? c.domain.slice(1) : c.domain;
+      const url = `${protocol}://${host}${c.path}`;
+      try {
+        const result = await chrome.cookies.remove({
+          url,
+          name: c.name,
+          storeId: c.storeId,
+        });
+        if (result) removed++;
+      } catch {
+        // Some cookies may fail to remove (HostOnly + odd domain combos).
+        // Move on; bulk path will catch most of them anyway.
+      }
+    })
+  );
+  const after = await chrome.cookies.getAll({});
+  LOG('nukeAllCookiesIndividually: removed', removed, 'of', cookies.length, '— remaining:', after.length);
+  return { attempted: cookies.length, removed, remaining: after.length };
 }
 
 async function clearAll() {
-  // originTypes:
-  //   unprotectedWeb (default true) — regular websites
-  //   protectedWeb               — websites installed as hosted apps. Without
-  //                                this, a user with Gmail/Workspace installed
-  //                                from chrome://apps keeps their cookies and
-  //                                localStorage across clears (the "Hosted app
-  //                                data" bucket in Chrome's UI).
-  //   extension                  — this extension's own data; off so the user
-  //                                doesn't lose their auto-mode preference.
-  await chrome.browsingData.remove(
-    {
-      since: 0,
-      originTypes: { unprotectedWeb: true, protectedWeb: true },
-    },
-    DATA_TO_REMOVE
-  );
+  const startedAt = Date.now();
+  LOG('clearAll: starting');
 
-  // chrome.browsingData.remove() doesn't touch site-settings rules
-  // (notification grants, location exceptions, etc.) — those live under
-  // chrome.contentSettings and have to be reset separately.
-  await clearContentSettings();
+  // 1. Bulk clear via chrome.browsingData.
+  try {
+    await chrome.browsingData.remove(
+      {
+        since: 0,
+        originTypes: { unprotectedWeb: true, protectedWeb: true },
+      },
+      DATA_TO_REMOVE
+    );
+    LOG('clearAll: chrome.browsingData.remove resolved');
+  } catch (e) {
+    LOG('clearAll: chrome.browsingData.remove THREW', e?.message || e);
+    // Don't return — try the cookies fallback anyway.
+  }
 
+  // 2. Belt-and-suspenders: nuke any cookies the bulk path missed.
+  try {
+    const cookieResult = await nukeAllCookiesIndividually();
+    LOG('clearAll: cookie fallback done', cookieResult);
+  } catch (e) {
+    LOG('clearAll: cookie fallback THREW', e?.message || e);
+  }
+
+  // 3. Reset Site Settings (chrome.contentSettings is a separate API).
+  try {
+    await clearContentSettings();
+  } catch (e) {
+    LOG('clearAll: clearContentSettings THREW', e?.message || e);
+  }
+
+  // 4. Record timestamp so the popup can show "Last cleared: …".
   await chrome.storage.local.set({ lastClearedAt: Date.now() });
+
+  const elapsed = Date.now() - startedAt;
+  LOG('clearAll: done in', elapsed, 'ms');
 }
 
 async function closeAllWindows() {
   const wins = await chrome.windows.getAll();
+  LOG('closeAllWindows: closing', wins.length, 'window(s)');
   await Promise.all(wins.map((w) => chrome.windows.remove(w.id).catch(() => {})));
 }
 
@@ -104,6 +161,7 @@ async function applyIdleDetection(mode) {
 }
 
 chrome.runtime.onInstalled.addListener(async (details) => {
+  LOG('onInstalled fired', details.reason);
   const { autoMode } = await chrome.storage.sync.get('autoMode');
   if (!autoMode) await chrome.storage.sync.set({ autoMode: 'off' });
 
@@ -122,61 +180,55 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// --- Auto-clear-on-close: design notes ---
+// --- Auto-clear-on-close: design notes (v0.1.4) ---
 //
-// MV3 service workers cannot reliably finish async work during Chrome
-// shutdown. chrome.browsingData.remove() initiates large SQLite/disk
-// operations (cookies, cache) that the SW gets killed in the middle of.
-// In v0.1.1 we tried-at-close + retry-on-startup, but if the in-flight
-// clearAll() *appeared* to resolve before the SW died (history finished,
-// cookies/cache mid-flight), we removed the pendingClearOnClose flag and
-// the startup safety net never ran. Result: cookies + cache survived.
+// MV3 service workers can't reliably finish async work during Chrome
+// shutdown. v0.1.3 used a pendingClearOnClose flag set by
+// chrome.windows.onRemoved and consumed by chrome.runtime.onStartup. If
+// either event misfired (e.g., Chrome continued running in background, the
+// SW was evicted before storage commit, the close handler didn't get
+// scheduled), the flag stayed unset and the startup pass skipped clearing.
 //
-// v0.1.2 strategy:
-//   1. On every onRemoved in close-mode, set pendingClearOnClose. (Flag
-//      stays set until a successful, fully-completed startup clear.)
-//   2. Best-effort fire-and-forget clear at close — if the SW survives
-//      long enough, great; we don't depend on it. We never remove the
-//      flag from the close path.
-//   3. On runtime.onStartup, if pendingClearOnClose is set, run the
-//      clear synchronously in a context where the SW is alive and not
-//      racing with shutdown. Only remove the flag after that completes.
-//      This is the guaranteed path.
-//
-// Net effect: data is always cleared, just possibly at next startup
-// instead of at close. No partial-clear bug.
+// v0.1.4: drop the flag dependency. **On every chrome.runtime.onStartup,
+// unconditionally clear if mode === 'close'.** The cost of an extra clear
+// when nothing's accumulated is negligible. The benefit is that the
+// startup pass runs even if the close handler never fired or the flag
+// never persisted. Best-effort at-close clear is preserved as a "maybe
+// the SW survives long enough" win.
 
 let closeBurstTimer = null;
 
 chrome.runtime.onStartup.addListener(async () => {
   const mode = await getMode();
-  const { pendingClearOnClose } = await chrome.storage.local.get('pendingClearOnClose');
-  if (pendingClearOnClose) {
+  LOG('onStartup fired, mode =', mode);
+  if (mode === 'close') {
+    LOG('onStartup: mode is close, running clearAll unconditionally');
     try {
       await clearAll();
-      await chrome.storage.local.remove('pendingClearOnClose');
-    } catch {
-      // Leave the flag set so the next startup retries.
+    } catch (e) {
+      LOG('onStartup: clearAll threw', e?.message || e);
     }
   }
   applyIdleDetection(mode);
 });
 
-chrome.windows.onRemoved.addListener(async () => {
+chrome.windows.onRemoved.addListener(async (windowId) => {
   const mode = await getMode();
+  LOG('onRemoved fired for window', windowId, '— mode =', mode);
   if (mode !== 'close') return;
 
-  // Always arm the startup safety net. This is the *guaranteed* path.
-  await chrome.storage.local.set({ pendingClearOnClose: true });
-
-  // Best-effort: try at close after the burst settles. Don't await, don't
-  // touch the flag — startup will handle it whether or not this completes.
+  // Best-effort at-close clear. Schedule after a 250 ms debounce so a burst
+  // of close events ("Close all windows") coalesces. If the SW survives long
+  // enough, great. If not, the next chrome.runtime.onStartup will run a
+  // guaranteed clear.
   if (closeBurstTimer) clearTimeout(closeBurstTimer);
   closeBurstTimer = setTimeout(async () => {
     closeBurstTimer = null;
     const remaining = await chrome.windows.getAll();
-    if (remaining.length > 0) return; // not the last window
-    clearAll().catch(() => { /* swallow — startup retries */ });
+    LOG('onRemoved (debounced): remaining windows =', remaining.length);
+    if (remaining.length > 0) return;
+    LOG('onRemoved (debounced): last window — kicking off best-effort clearAll');
+    clearAll().catch((e) => LOG('best-effort clearAll threw', e?.message || e));
   }, 250);
 });
 
@@ -184,6 +236,7 @@ chrome.idle.onStateChanged.addListener(async (state) => {
   if (state !== 'idle' && state !== 'locked') return;
   const mode = await getMode();
   if (mode === 'inactive') {
+    LOG('idle.onStateChanged:', state, '— mode is inactive, clearing');
     await clearAll();
   }
 });
@@ -192,6 +245,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     try {
       if (msg?.type === 'clearNow') {
+        LOG('onMessage: clearNow received');
         await clearAll();
         sendResponse({ ok: true });
       } else if (msg?.type === 'closeBrowser') {
@@ -204,6 +258,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: false, error: 'unknown message' });
       }
     } catch (e) {
+      LOG('onMessage handler threw', e?.message || e);
       sendResponse({ ok: false, error: String(e?.message || e) });
     }
   })();

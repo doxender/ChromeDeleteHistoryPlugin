@@ -11,8 +11,10 @@ processing happens locally in your browser.
 
 - **Browsing data** (history, cache, cookies, downloads, site storage,
   hosted-app data) — only in order to delete it at your request via the
-  Chrome `browsingData` API. No data is read or inspected; it is erased
-  directly.
+  Chrome `browsingData` API and (for cookies) the `chrome.cookies` API.
+  Cookie metadata (domain, name, path) is read only to call
+  `chrome.cookies.remove()` on each cookie; no values are inspected or
+  exfiltrated, and the act is bounded to "delete it now."
 - **Site settings** (per-site permission grants for notifications,
   location, camera, microphone, popups, etc.) — only in order to reset
   them on a clear, via the `chrome.contentSettings` API. The extension
@@ -30,7 +32,10 @@ processing happens locally in your browser.
 
 - No network requests of any kind. The extension contains no `fetch`, `XHR`,
   analytics, telemetry, crash reporting, or third-party scripts.
-- No host permissions — it cannot read or modify the content of any webpage.
+- No content scripts. Although `<all_urls>` host permission is declared
+  (required by the `chrome.cookies` API), the extension does **not** inject
+  scripts into web pages or read page content. The host permission is
+  scoped solely to enumerating and removing cookies.
 - No data leaves your device. There is no server; there is no author-side
   logging.
 
@@ -38,7 +43,8 @@ processing happens locally in your browser.
 
 | Permission | Purpose |
 |---|---|
-| `browsingData` | Delete browsing data at your request. |
+| `browsingData` | Delete browsing data at your request (bulk path). |
+| `cookies` + `<all_urls>` | Enumerate the cookie store and remove every cookie individually (belt-and-suspenders for the bulk path). |
 | `contentSettings` | Reset per-site permission grants (notifications, location, camera, etc.) — what Chrome's UI calls "Site Settings". |
 | `storage` | Remember your auto-clear setting. |
 | `idle` | Detect inactivity (only when "Auto-Clear When Idle" is on). |

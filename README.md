@@ -1,7 +1,7 @@
 # Clear History &amp; Close
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
-![version](https://img.shields.io/badge/version-0.1.3-blue)
+![version](https://img.shields.io/badge/version-0.1.4-blue)
 ![manifest](https://img.shields.io/badge/manifest-v3-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -20,11 +20,12 @@ click — then closes Chrome. Saved passwords and form-autofill data are **kept*
 - **Auto-Clear on Close** — clears when the **last** Chrome window is closed.
   Single tabs and non-final windows do not trigger a clear; only the final
   window-removal does. Because Manifest V3 service workers can't reliably
-  finish large I/O during Chrome shutdown, the actual clear runs on the
-  *next Chrome startup* — guaranteed atomic, no partial-clear bug. (A
-  best-effort attempt also fires at close-time; if it completes, fine, but
-  the design doesn't depend on it.) Net behavior: data is always gone, just
-  possibly at next launch instead of at close.
+  finish large I/O during Chrome shutdown, every Chrome startup with
+  mode=`close` runs a guaranteed clear (no flag dependency — drops if Chrome
+  was running in background or the close handler missed). A best-effort
+  clear also fires at close-time; if it completes, fine, but the design
+  doesn't depend on it. Net behavior: data is always gone, just possibly
+  at next launch instead of at close.
 - **Auto-Clear When Idle** — clears after 5 minutes of inactivity using the
   `chrome.idle` API.
 - **Permissions requested at install time** so everything works immediately.
@@ -58,7 +59,7 @@ Coming soon. See [`docs/CHROME_STORE.md`](docs/CHROME_STORE.md) for the publish 
 
 ## How it works
 
-- `manifest.json` — MV3 manifest, declares `browsingData`, `contentSettings`, `storage`, `idle`, `alarms`.
+- `manifest.json` — MV3 manifest, declares `browsingData`, `contentSettings`, `cookies`, `storage`, `idle`, `alarms` and `<all_urls>` host permission.
 - `popup.html` / `popup.css` / `popup.js` — the popup UI (Clear &amp; Close button and auto-mode toggle).
 - `background.js` — service worker: listens for window-close and idle events,
   handles messages from the popup, persists settings via `chrome.storage.sync`.
@@ -69,13 +70,14 @@ Coming soon. See [`docs/CHROME_STORE.md`](docs/CHROME_STORE.md) for the publish 
 
 | Permission | Why |
 |---|---|
-| `browsingData` | Deleting cookies, cache, history, downloads, site storage. |
+| `browsingData` | Deleting cookies, cache, history, downloads, site storage (bulk path). |
+| `cookies` + `<all_urls>` host permission | Belt-and-suspenders: enumerate every cookie via `chrome.cookies.getAll({})` and remove individually, in case the bulk `browsingData` path silently misses any. No web pages are read; only the cookie store is touched. |
 | `contentSettings` | Resetting per-site permission grants (notifications, location, camera) and other site-settings exceptions — Chrome's "Site Settings" bucket. |
 | `storage` | Remembering your auto-clear mode across sessions. |
 | `idle` | Detecting when Chrome has been inactive for 5 minutes. |
 | `alarms` | One-time "welcome" badge cleanup after install. |
 
-No host permissions. No network access. Nothing is uploaded anywhere.
+The `<all_urls>` host permission is required by `chrome.cookies.remove`; the extension does **not** read or modify webpage content (no content scripts declared). No network requests are made; nothing is uploaded.
 
 ## Development
 

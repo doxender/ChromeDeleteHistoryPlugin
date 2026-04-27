@@ -5,6 +5,55 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/) — pre-1.0 is alpha,
 behavior may change.
 
+## [0.1.4] — 2026-04-25
+
+### Fixed
+- **Auto-clear-on-close still left cookies on disk after v0.1.3.** Two
+  compounding causes:
+  1. Startup clear was gated on a `pendingClearOnClose` flag set by the
+     `chrome.windows.onRemoved` handler. If that handler didn't run (Chrome
+     continued running in background, the SW was evicted before the storage
+     write committed, etc.), the flag stayed unset and the next-startup
+     pass skipped clearing entirely.
+  2. The bulk `chrome.browsingData.remove()` path can silently miss cookies
+     for reasons that aren't fully understood from the extension side
+     (suspect: MV3 SW eviction during the SQLite write).
+
+  Fixes:
+  - **Drop the flag dependency.** Every `chrome.runtime.onStartup` with
+    mode=`close` now runs `clearAll()` unconditionally. The cost of an
+    extra clear when nothing's accumulated is negligible.
+  - **Belt-and-suspenders cookie path.** Added `nukeAllCookiesIndividually()`
+    which enumerates the cookie store via `chrome.cookies.getAll({})` and
+    removes each cookie individually. This uses a separate code path from
+    `browsingData.remove`, so leftovers from the bulk path get caught.
+
+### Added
+- **`Last cleared: …` indicator in the popup footer.** Reads
+  `chrome.storage.local.lastClearedAt` and renders relative time (e.g.,
+  "cleared 2m ago"). If a clear didn't run, it shows "never cleared" — an
+  immediate at-a-glance sanity check that lifecycle events fired.
+- **Service-worker console logging.** Every critical path
+  (`onStartup`, `onRemoved`, `clearAll`, `nukeAllCookiesIndividually`,
+  `clearContentSettings`, `onMessage`) emits `[ClearHistory] …` lines to
+  the SW console. Open `chrome://extensions` → click "Inspect views:
+  service worker" on the extension card to read them. Critical for
+  diagnosing future close-time issues.
+- **`cookies` permission** + **`<all_urls>` host permission** added to
+  `manifest.json`. Required by the new `chrome.cookies.remove` calls. The
+  extension still injects no content scripts and makes no network requests.
+
+### Note for users
+- After upgrading you'll need to **reload the extension** at
+  `chrome://extensions` so Chrome accepts the new `cookies` and
+  `<all_urls>` permissions. Popup footer should read `v0.1.4 · alpha`.
+- If the bug persists after this upgrade, open
+  `chrome://extensions` → click the **"Inspect views: service worker"**
+  link on the extension's card → switch to the **Console** tab → trigger a
+  close, reopen Chrome, then read the `[ClearHistory]` log lines. They'll
+  show whether `onStartup` fired, whether `clearAll` was called, how many
+  cookies it found, how many it removed, and whether anything threw.
+
 ## [0.1.3] — 2026-04-25
 
 ### Fixed
