@@ -5,6 +5,50 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/) — pre-1.0 is alpha,
 behavior may change.
 
+## [0.2.0] — 2026-04-25
+
+First "real" alpha release — a milestone roll-up of the v0.1.x series. **No
+code changes since [0.1.4]**; this is a version-bump release tag so the work
+done in 0.1.0 → 0.1.4 lands in the GitHub Releases page as a single
+public-facing entry.
+
+User-facing release notes for the GitHub Release page:
+[`docs/release-notes/v0.2.0.md`](docs/release-notes/v0.2.0.md).
+
+### Cumulative since first push (0.1.0)
+- One-click **Clear &amp; Close** popup button.
+- **Auto-clear modes**: Off / On Close / When Idle (5 min).
+- Clears: history, cookies (twice — bulk + per-cookie fallback),
+  cache, cacheStorage, downloads, indexedDB, localStorage, service
+  workers, file systems, hosted-app data (`originTypes.protectedWeb`),
+  and **Site Settings** (per-site notification / location / camera /
+  popup grants via `chrome.contentSettings`).
+- **Preserved by design**: saved passwords, saved form-autofill.
+- **Race-free close-handler** (debounced; survives "Close all windows" /
+  Alt-F4 bursts).
+- **Lifecycle-robust auto-on-close**: every `chrome.runtime.onStartup`
+  with mode=`close` runs `clearAll()` unconditionally — no flag-based
+  gating that could miss-fire under MV3 service-worker eviction.
+- **In-popup verification** — footer shows "cleared Xm ago" /
+  "never cleared".
+- **SW console logging** under the `[ClearHistory]` tag for diagnosing
+  any future close-time issues.
+
+### Known limitations carried into 0.2.0
+- Five Chrome-internal cookies (Google sign-in / safebrowsing / sync /
+  gstatic / update services) get re-issued the moment Chrome connects
+  on startup, regardless of clearer. Chrome's own "Delete from this
+  device" leaves the same five behind. Considered irreducible.
+- "Hosted app data — Web Store (1 app)" survives every clearer
+  including Chrome's native UI. Chrome-managed; not reachable via the
+  extension API.
+- A small number of newer Chrome content-setting types (e.g.
+  `clipboardRead`, `paymentHandler`, `idleDetection`,
+  `windowPlacement`, `screenWakeLock`, `localFonts`) are not exposed
+  via `chrome.contentSettings`, so per-site grants of those types
+  can't be reset by this extension. The set of types that *are*
+  reachable matches Chrome's own dialog for most users.
+
 ## [0.1.4] — 2026-04-25
 
 ### Fixed
