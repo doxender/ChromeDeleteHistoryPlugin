@@ -16,12 +16,27 @@
 From the project root:
 
 ```bash
-# PowerShell
-Compress-Archive -Path manifest.json,background.js,popup.html,popup.css,popup.js,icons -DestinationPath dist\clear-history-and-close-v0.1.3.zip -Force
+python tools/build-package.py
 ```
 
-Don't include: `tools/`, `docs/`, `.git/`, `README.md`, `PRIVACY.md`, `LICENSE`.
-Only files the extension actually loads.
+Reads the version from `manifest.json` and writes
+`dist/clear-history-and-close-v<version>.zip` (gitignored). Includes the
+runtime files (`manifest.json`, `background.js`, `popup.*`, `icons/`)
+plus `INSTALL.md` (sideload instructions for end users), `LICENSE`, and
+`PRIVACY.md`. Excludes `tools/`, `docs/`, `.github/`, `.git/`, and the
+project-root `README.md` (which targets a GitHub-browser audience and
+isn't useful inside the zip).
+
+The same zip is suitable for **two distinct distribution channels**:
+
+1. **Sideload distribution** — attach the zip to a GitHub Release; users
+   download, unzip, and follow `INSTALL.md` to load unpacked at
+   `chrome://extensions`. This is the channel for alpha / beta / pre-store
+   builds.
+2. **Chrome Web Store submission** — upload the same zip in the developer
+   dashboard. Store reviewers ignore extra docs like `INSTALL.md` and
+   `PRIVACY.md` inside the zip; they only validate the manifest and
+   runtime behavior.
 
 ## Developer Dashboard steps
 

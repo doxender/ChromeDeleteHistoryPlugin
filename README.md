@@ -48,10 +48,26 @@ click — then closes Chrome. Saved passwords and form-autofill data are **kept*
 
 ## Install (developer / side-load)
 
+**Easiest — download the zip from a Release**:
+
+1. Go to the [Releases page](https://github.com/doxender/ChromeDeleteHistoryPlugin/releases) and grab the `clear-history-and-close-v*.zip` from the latest tag.
+2. Unzip it somewhere you'll keep (Chrome reads the extension straight from disk; don't put it under `Downloads` or `%TEMP%`).
+3. Follow [`INSTALL.md`](INSTALL.md) (also bundled inside the zip).
+
+**From source**:
+
 1. `git clone` this repo.
 2. Open `chrome://extensions`.
 3. Enable **Developer mode** (top right).
 4. Click **Load unpacked** and select the project folder.
+
+To build a fresh zip yourself:
+
+```bash
+python tools/build-package.py
+```
+
+That writes `dist/clear-history-and-close-v<version>.zip` from the current `manifest.json` version.
 
 ## Install (Chrome Web Store)
 
