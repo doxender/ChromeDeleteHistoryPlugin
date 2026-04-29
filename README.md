@@ -1,7 +1,7 @@
 # Clear History &amp; Close
 
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
-![version](https://img.shields.io/badge/version-0.1.4-blue)
+![version](https://img.shields.io/badge/version-0.2.0-blue)
 ![manifest](https://img.shields.io/badge/manifest-v3-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
